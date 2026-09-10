@@ -1,0 +1,58 @@
+name: mi_abuelito
+description: "App móvil colaborativa para el registro de signos vitales, control médico y sincronización familiar del cuidado de abuelos."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # Gestión de Estado
+  provider: ^6.1.2
+
+  # Monetización con Google AdMob
+  google_mobile_ads: ^9.1.0
+
+  # Gráficos Médicos
+  fl_chart: ^0.68.0
+
+  # Generación de Reportes PDF y Compartir
+  pdf: ^3.10.8
+  printing: ^5.15.0
+
+  # Persistencia y Utilidades
+  shared_preferences: ^2.2.3
+  intl: ^0.20.3
+  uuid: ^4.4.0
+  flutter_local_notifications: ^17.2.1
+
+  # Íconos y UI
+  cupertino_icons: ^1.0.8
+  firebase_core: ^4.14.0
+  cloud_firestore: ^6.9.0
+  url_launcher: ^6.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/app_icon.png"
+  min_sdk_android: 23
+  adaptive_icon_background: "#7B9FE0"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icon/

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Registro colaborativo de signos vitales para el cuidado de abuelos y adultos mayores.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Mi Abuelito">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Mi Abuelito - Control de Salud Familiar</title>
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+  <script src="flutter_bootstrap.js" async></script>
+
+  <!-- Flag Counter: cargado directamente por el navegador del usuario para registrar su IP real -->
+  <style>
+    #flag-counter-wrap {
+      position: fixed;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      pointer-events: auto;
+      opacity: 0.88;
+    }
+    #flag-counter-wrap:hover { opacity: 1; }
+    #flag-counter-wrap a img {
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+      border: 1px solid #e5e7eb;
+      display: block;
+    }
+    #flag-counter-label {
+      font-family: sans-serif;
+      font-size: 9px;
+      color: #9ca3af;
+      letter-spacing: 0.3px;
+    }
+  </style>
+  <div id="flag-counter-wrap">
+    <a href="https://info.flagcounter.com/gutV" target="_blank">
+      <img src="https://s01.flagcounter.com/count/gutV/bg_FFFFFF/txt_4B5563/border_E2E8F0/columns_3/maxflags_6/viewers_0/labels_0/pageviews_1/flags_1/percent_0/" alt="Visitas" />
+    </a>
+    <span id="flag-counter-label">Ver estadísticas en vivo</span>
+  </div>
+</body>
+</html>
