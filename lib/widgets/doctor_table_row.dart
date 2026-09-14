@@ -6,11 +6,13 @@ import '../models/vital_sign.dart';
 class DoctorTableRow extends StatelessWidget {
   final VitalSign registro;
   final bool isEven;
+  final VoidCallback? onTap;
 
   const DoctorTableRow({
     super.key,
     required this.registro,
     this.isEven = true,
+    this.onTap,
   });
 
   @override
@@ -19,7 +21,6 @@ class DoctorTableRow extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: isEven ? Colors.white : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(8),
@@ -32,8 +33,16 @@ class DoctorTableRow extends StatelessWidget {
           width: severity == ClinicalSeverity.crisis ? 1.5 : 0.5,
         ),
       ),
-      child: Row(
-        children: [
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
           // ── Fecha y Hora ────────────────────────────────────────────────
           SizedBox(
             width: 72,
@@ -155,8 +164,11 @@ class DoctorTableRow extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  ),
+),
+);
+}
 
   String _tipoEmoji(VitalType type) {
     switch (type) {

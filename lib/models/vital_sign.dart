@@ -76,6 +76,44 @@ class VitalSign {
     this.pulso,
   });
 
+  VitalSign copyWith({
+    String? id,
+    String? abueloId,
+    VitalType? type,
+    DateTime? timestamp,
+    TimeSlot? timeSlot,
+    String? familiarNombre,
+    String? parentesco,
+    String? notas,
+    double? glucosaValor,
+    String? glucosaMomento,
+    int? orinaCc,
+    bool? esPanal,
+    String? orinaAspecto,
+    int? sistolica,
+    int? diastolica,
+    int? pulso,
+  }) {
+    return VitalSign(
+      id: id ?? this.id,
+      abueloId: abueloId ?? this.abueloId,
+      type: type ?? this.type,
+      timestamp: timestamp ?? this.timestamp,
+      timeSlot: timeSlot ?? this.timeSlot,
+      familiarNombre: familiarNombre ?? this.familiarNombre,
+      parentesco: parentesco ?? this.parentesco,
+      notas: notas ?? this.notas,
+      glucosaValor: glucosaValor ?? this.glucosaValor,
+      glucosaMomento: glucosaMomento ?? this.glucosaMomento,
+      orinaCc: orinaCc ?? this.orinaCc,
+      esPanal: esPanal ?? this.esPanal,
+      orinaAspecto: orinaAspecto ?? this.orinaAspecto,
+      sistolica: sistolica ?? this.sistolica,
+      diastolica: diastolica ?? this.diastolica,
+      pulso: pulso ?? this.pulso,
+    );
+  }
+
   // Cálculo clínico de severidad para la glucosa (ADA)
   ClinicalSeverity get glucosaSeverity {
     if (glucosaValor == null) return ClinicalSeverity.normal;

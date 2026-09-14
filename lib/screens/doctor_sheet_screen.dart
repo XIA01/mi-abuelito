@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/vital_sign.dart';
 import '../providers/patient_provider.dart';
 import '../widgets/doctor_summary_header.dart';
 import '../widgets/doctor_table_row.dart';
 import '../services/pdf_report_service.dart';
 import '../services/ad_service.dart';
+import 'log_vital_screen.dart';
 
 /// 🩺 Pantalla "Modo Planilla Médica Digital"
 /// Diseñada para entregársela al médico en la consulta.
@@ -213,6 +215,8 @@ class _DoctorSheetScreenState extends State<DoctorSheetScreen> {
                     (context, idx) => DoctorTableRow(
                       registro: registros[idx],
                       isEven: idx % 2 == 0,
+                      onTap: () =>
+                          _mostrarOpcionesRegistro(context, registros[idx]),
                     ),
                     childCount: registros.length,
                   ),
@@ -257,5 +261,211 @@ class _DoctorSheetScreenState extends State<DoctorSheetScreen> {
       context: context,
     );
     setState(() => _exportando = false);
+  }
+
+  void _mostrarOpcionesRegistro(BuildContext context, VitalSign reg) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                Text(_emojiPorTipo(reg.type),
+                    style: const TextStyle(fontSize: 28)),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        reg.valorFormateado,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: reg.severity.textColor,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${reg.familiarNombre} · ${reg.fechaYHoraFormateada}',
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: reg.severity.bgColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    reg.severity.label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: reg.severity.textColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (reg.notas != null && reg.notas!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '📝 ${reg.notas}',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade700,
+                      fontStyle: FontStyle.italic),
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            const Divider(),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.edit_outlined, color: Colors.blue),
+              ),
+              title: const Text('Editar medición',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text(
+                  'Corregir valor, fecha/hora, notas o momento',
+                  style: TextStyle(fontSize: 12)),
+              trailing:
+                  const Icon(Icons.chevron_right, color: Colors.grey),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => LogVitalScreen(
+                      tipo: reg.type,
+                      registroAEditar: reg,
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 4),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.delete_outline, color: Colors.red),
+              ),
+              title: const Text('Eliminar medición',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, color: Colors.red)),
+              subtitle: const Text(
+                  'Borrar definitivamente este registro del historial',
+                  style: TextStyle(fontSize: 12)),
+              trailing:
+                  const Icon(Icons.chevron_right, color: Colors.grey),
+              onTap: () {
+                Navigator.pop(ctx);
+                _confirmarEliminarMedicion(context, reg);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmarEliminarMedicion(BuildContext context, VitalSign reg) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_outline, color: Colors.red),
+            SizedBox(width: 8),
+            Text('¿Eliminar medición?'),
+          ],
+        ),
+        content: Text(
+          'Se eliminará este registro de ${reg.valorFormateado} (${reg.fechaYHoraFormateada}) para toda la familia.',
+          style: const TextStyle(fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final provider = context.read<PatientProvider>();
+              await provider.eliminarRegistro(reg.id);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('🗑️ Medición eliminada'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+            child: const Text('Eliminar definitivamente'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _emojiPorTipo(VitalType t) {
+    switch (t) {
+      case VitalType.glucosa:
+        return '🩸';
+      case VitalType.orina:
+        return '💧';
+      case VitalType.presion:
+        return '💓';
+    }
   }
 }

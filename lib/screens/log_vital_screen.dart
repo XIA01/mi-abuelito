@@ -6,7 +6,13 @@ import '../providers/patient_provider.dart';
 
 class LogVitalScreen extends StatefulWidget {
   final VitalType tipo;
-  const LogVitalScreen({super.key, required this.tipo});
+  final VitalSign? registroAEditar;
+
+  const LogVitalScreen({
+    super.key,
+    required this.tipo,
+    this.registroAEditar,
+  });
 
   @override
   State<LogVitalScreen> createState() => _LogVitalScreenState();
@@ -49,6 +55,33 @@ class _LogVitalScreenState extends State<LogVitalScreen> {
   };
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.registroAEditar != null) {
+      final r = widget.registroAEditar!;
+      _fechaHora = r.timestamp;
+      _notasCtrl.text = r.notas ?? '';
+      switch (widget.tipo) {
+        case VitalType.glucosa:
+          if (r.glucosaValor != null) {
+            _glucosaCtrl.text = (r.glucosaValor! % 1 == 0)
+                ? r.glucosaValor!.toInt().toString()
+                : r.glucosaValor!.toString();
+          }
+          _momentoGlucosa = r.glucosaMomento ?? 'ayunas';
+        case VitalType.orina:
+          _orinaCc = r.orinaCc;
+          _esPanal = r.esPanal;
+          _orinaAspecto = r.orinaAspecto;
+        case VitalType.presion:
+          _sistolicaCtrl.text = r.sistolica?.toString() ?? '';
+          _diastolicaCtrl.text = r.diastolica?.toString() ?? '';
+          _pulsoCtrl.text = r.pulso?.toString() ?? '';
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _glucosaCtrl.dispose();
     _sistolicaCtrl.dispose();
@@ -67,6 +100,14 @@ class _LogVitalScreenState extends State<LogVitalScreen> {
         backgroundColor: _color,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          if (widget.registroAEditar != null)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.white),
+              tooltip: 'Eliminar esta medición',
+              onPressed: () => _confirmarEliminar(context),
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -141,7 +182,11 @@ class _LogVitalScreenState extends State<LogVitalScreen> {
                             color: Colors.white, strokeWidth: 2))
                     : const Icon(Icons.save_outlined, size: 22),
                 label: Text(
-                  _guardando ? 'Guardando...' : 'Guardar registro',
+                  _guardando
+                      ? 'Guardando...'
+                      : (widget.registroAEditar != null
+                          ? 'Guardar cambios'
+                          : 'Guardar registro'),
                   style: const TextStyle(
                       fontSize: 17, fontWeight: FontWeight.bold),
                 ),
@@ -587,6 +632,14 @@ class _LogVitalScreenState extends State<LogVitalScreen> {
         );
     }
 
+    if (widget.registroAEditar != null) {
+      registro = registro.copyWith(
+        id: widget.registroAEditar!.id,
+        familiarNombre: widget.registroAEditar!.familiarNombre,
+        parentesco: widget.registroAEditar!.parentesco,
+      );
+    }
+
     setState(() => _guardando = true);
     await provider.guardarRegistro(registro);
     setState(() => _guardando = false);
@@ -595,7 +648,9 @@ class _LogVitalScreenState extends State<LogVitalScreen> {
       HapticFeedback.lightImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('✅ ¡Guardado!'),
+          content: Text(widget.registroAEditar != null
+              ? '✅ ¡Medición actualizada!'
+              : '✅ ¡Guardado!'),
           backgroundColor: Colors.green.shade600,
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
@@ -605,6 +660,53 @@ class _LogVitalScreenState extends State<LogVitalScreen> {
       );
       Navigator.of(context).pop();
     }
+  }
+
+  void _confirmarEliminar(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_outline, color: Colors.red),
+            SizedBox(width: 8),
+            Text('¿Eliminar medición?'),
+          ],
+        ),
+        content: const Text(
+          'Esta medición se eliminará permanentemente del historial para toda la familia.',
+          style: TextStyle(fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final provider = context.read<PatientProvider>();
+              await provider.eliminarRegistro(widget.registroAEditar!.id);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('🗑️ Medición eliminada'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+                Navigator.of(context).pop();
+              }
+            },
+            child: const Text('Eliminar definitivamente'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _mostrarError(String msg) {
@@ -621,13 +723,14 @@ class _LogVitalScreenState extends State<LogVitalScreen> {
 
   // ─── Propiedades visuales por tipo ───────────────────────────────────────
   String get _titulo {
+    final accion = widget.registroAEditar != null ? 'Editar' : 'Registrar';
     switch (widget.tipo) {
       case VitalType.glucosa:
-        return 'Registrar Azúcar';
+        return '$accion Azúcar';
       case VitalType.orina:
-        return 'Registrar Orina';
+        return '$accion Orina';
       case VitalType.presion:
-        return 'Registrar Presión';
+        return '$accion Presión';
     }
   }
 
