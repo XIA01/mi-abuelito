@@ -35,11 +35,11 @@
 | Base de datos | Firebase Firestore (en la nube) + SharedPreferences (local) |
 | Estado | Provider |
 | PDF | `pdf` + `printing` |
-| Hosting | Netlify (gratis) |
+| Hosting | Vercel (gratis) |
 
 ## 🚀 Demo en vivo
 
-👉 [mi-abuelito.netlify.app](https://mi-abuelito.netlify.app)
+👉 [mi-abuelito.vercel.app](https://mi-abuelito.vercel.app)
 
 ## 🏁 Cómo correrlo localmente
 
@@ -77,7 +77,8 @@
 5. Build web para producción:
    ```bash
    flutter build web --release
-   # El resultado queda en build/web/ — arrastralo a Netlify
+   # El resultado queda en build/web/. Para compilar y publicar en Vercel de una vez:
+   # doble clic en publicar_web.bat (la primera vez: npx vercel login)
    ```
 
 ## 🔐 Seguridad y privacidad
