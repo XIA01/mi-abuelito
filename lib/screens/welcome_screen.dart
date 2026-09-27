@@ -166,16 +166,18 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               TextField(
                 controller: _codigoController,
                 textCapitalization: TextCapitalization.characters,
-                maxLength: 6,
+                autocorrect: false,
+                enableSuggestions: false,
+                maxLength: 10,
                 style: const TextStyle(
-                    fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: 8),
+                    fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 3),
                 textAlign: TextAlign.center,
                 decoration: InputDecoration(
-                  hintText: 'A 4 5 3',
+                  hintText: 'K7QM-4XPA',
                   hintStyle: TextStyle(
                       color: Colors.grey.shade400,
-                      fontSize: 28,
-                      letterSpacing: 8),
+                      fontSize: 24,
+                      letterSpacing: 3),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12)),
                   filled: true,
@@ -301,9 +303,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   }
 
   Future<void> _onUnirse() async {
-    if (_codigoController.text.trim().length < 4 ||
-        _familiarNombreUnirse.text.trim().isEmpty) {
+    if (_familiarNombreUnirse.text.trim().isEmpty) {
       _mostrarError('Ingresá el código y tu nombre.');
+      return;
+    }
+    if (!PatientProvider.codigoValido(
+        PatientProvider.normalizarCodigo(_codigoController.text))) {
+      _mostrarError('El código tiene 8 letras y números (ej: K7QM-4XPA).');
       return;
     }
     setState(() => _cargando = true);
@@ -313,12 +319,15 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       familiarNombre: _familiarNombreUnirse.text.trim(),
       familiarParentesco: _parentescoUnirse.text.trim(),
     );
+    if (!mounted) return;
     setState(() => _cargando = false);
-    if (mounted && provider.tienePerfilCargado) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeDashboardScreen()),
-      );
+    if (!provider.tienePerfilCargado) {
+      _mostrarError(provider.error ?? 'No se pudo unir al código.');
+      return;
     }
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const HomeDashboardScreen()),
+    );
   }
 
   void _mostrarCodigoYContinuar(String codigo) {
@@ -345,13 +354,16 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: Colors.blue.shade300, width: 2),
               ),
-              child: Text(
-                codigo,
-                style: TextStyle(
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue.shade800,
-                  letterSpacing: 10,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  PatientProvider.formatearCodigo(codigo),
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade800,
+                    letterSpacing: 4,
+                  ),
                 ),
               ),
             ),

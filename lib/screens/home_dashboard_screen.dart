@@ -40,13 +40,16 @@ class HomeDashboardScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.blue.shade300, width: 2),
                 ),
-                child: Text(
-                  codigo,
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 4,
-                    color: Colors.blue.shade900,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    PatientProvider.formatearCodigo(codigo),
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 4,
+                      color: Colors.blue.shade900,
+                    ),
                   ),
                 ),
               ),
@@ -65,11 +68,11 @@ class HomeDashboardScreen extends StatelessWidget {
             icon: const Icon(Icons.copy),
             label: const Text('Copiar código'),
             onPressed: () {
-              Clipboard.setData(ClipboardData(text: codigo));
+              Clipboard.setData(ClipboardData(text: PatientProvider.formatearCodigo(codigo)));
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('✅ Código $codigo copiado al portapapeles'),
+                  content: Text('✅ Código ${PatientProvider.formatearCodigo(codigo)} copiado al portapapeles'),
                   behavior: SnackBarBehavior.floating,
                 ),
               );

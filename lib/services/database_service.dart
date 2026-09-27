@@ -76,6 +76,8 @@ class DatabaseService {
         .collection('abuelos')
         .doc(abueloId)
         .snapshots()
+        // Un "no existe" que viene de la caché offline no significa que lo hayan borrado
+        .where((snap) => snap.exists || !snap.metadata.isFromCache)
         .map((snap) {
       if (!snap.exists || snap.data() == null) return null;
       return PatientProfile.fromJson(snap.data()!);
@@ -98,35 +100,9 @@ class DatabaseService {
   }
 
   // ─── Registros de Signos Vitales ─────────────────────────────────────────
-  Future<List<VitalSign>> cargarRegistros(String abueloId) async {
+  /// Lee solo la caché local (sin lecturas de Firestore)
+  Future<List<VitalSign>> cargarRegistrosLocales(String abueloId) async {
     final prefs = await SharedPreferences.getInstance();
-
-    // Intentar leer de Firestore primero
-    try {
-      final snap = await _firestore
-          .collection('abuelos')
-          .doc(abueloId)
-          .collection('registros')
-          .get();
-
-      if (snap.docs.isNotEmpty) {
-        final cloudList = snap.docs
-            .map((d) => VitalSign.fromJson(d.data()))
-            .toList()
-          ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-
-        // Actualizar cache local
-        await prefs.setString(
-          '${_registrosKey}_$abueloId',
-          jsonEncode(cloudList.map((e) => e.toJson()).toList()),
-        );
-        return cloudList;
-      }
-    } catch (e) {
-      debugPrint('Error obteniendo registros de Firestore: $e');
-    }
-
-    // Fallback a almacenamiento local
     final raw = prefs.getString('${_registrosKey}_$abueloId');
     if (raw == null) return [];
     try {
@@ -139,6 +115,14 @@ class DatabaseService {
       debugPrint('Error cargando registros locales: $e');
       return [];
     }
+  }
+
+  Future<void> guardarCacheLocal(String abueloId, List<VitalSign> registros) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      '${_registrosKey}_$abueloId',
+      jsonEncode(registros.map((e) => e.toJson()).toList()),
+    );
   }
 
   /// Escuchar registros en TIEMPO REAL desde la nube
@@ -155,9 +139,8 @@ class DatabaseService {
     });
   }
 
-  Future<String> guardarRegistro(VitalSign registro) async {
-    final prefs = await SharedPreferences.getInstance();
-    final registros = await cargarRegistros(registro.abueloId);
+  Future<VitalSign> guardarRegistro(VitalSign registro) async {
+    final registros = await cargarRegistrosLocales(registro.abueloId);
 
     // Asignar ID si no lo tiene
     final nuevoRegistro = registro.id.isEmpty
@@ -167,45 +150,33 @@ class DatabaseService {
     // 1. Guardar localmente
     registros.removeWhere((r) => r.id == nuevoRegistro.id);
     registros.insert(0, nuevoRegistro);
-    await prefs.setString(
-      '${_registrosKey}_${registro.abueloId}',
-      jsonEncode(registros.map((e) => e.toJson()).toList()),
-    );
+    await guardarCacheLocal(registro.abueloId, registros);
 
-    // 2. Guardar en Firestore
-    try {
-      await _firestore
-          .collection('abuelos')
-          .doc(registro.abueloId)
-          .collection('registros')
-          .doc(nuevoRegistro.id)
-          .set(nuevoRegistro.toJson());
-    } catch (e) {
-      debugPrint('Error guardando registro en Firestore: $e');
-    }
+    // 2. Guardar en Firestore. No se espera la confirmación del servidor:
+    // sin conexión el Future no termina hasta reconectar y la UI quedaría colgada.
+    _firestore
+        .collection('abuelos')
+        .doc(registro.abueloId)
+        .collection('registros')
+        .doc(nuevoRegistro.id)
+        .set(nuevoRegistro.toJson())
+        .catchError((e) => debugPrint('Error guardando registro en Firestore: $e'));
 
-    return nuevoRegistro.id;
+    return nuevoRegistro;
   }
 
   Future<void> eliminarRegistro(String abueloId, String registroId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final registros = await cargarRegistros(abueloId);
+    final registros = await cargarRegistrosLocales(abueloId);
     registros.removeWhere((e) => e.id == registroId);
-    await prefs.setString(
-      '${_registrosKey}_$abueloId',
-      jsonEncode(registros.map((e) => e.toJson()).toList()),
-    );
+    await guardarCacheLocal(abueloId, registros);
 
-    try {
-      await _firestore
-          .collection('abuelos')
-          .doc(abueloId)
-          .collection('registros')
-          .doc(registroId)
-          .delete();
-    } catch (e) {
-      debugPrint('Error eliminando de Firestore: $e');
-    }
+    _firestore
+        .collection('abuelos')
+        .doc(abueloId)
+        .collection('registros')
+        .doc(registroId)
+        .delete()
+        .catchError((e) => debugPrint('Error eliminando de Firestore: $e'));
   }
 
   Future<void> salirDeEsteDispositivo() async {

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../models/vital_sign.dart';
 
 /// Cabecera fija de promedios clínicos para el Modo Planilla Médica
 class DoctorSummaryHeader extends StatelessWidget {

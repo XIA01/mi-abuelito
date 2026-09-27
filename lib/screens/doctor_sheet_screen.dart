@@ -254,13 +254,14 @@ class _DoctorSheetScreenState extends State<DoctorSheetScreen> {
     setState(() => _exportando = true);
     // Mostrar anuncio Interstitial antes de generar el PDF
     await AdService().mostrarInterstitial();
+    if (!mounted) return;
     await PdfReportService().generarYCompartirReporte(
       perfil: provider.perfil!,
       registros: provider.registrosFiltrados,
       periodoLabel: provider.filtroFechaLabel,
       context: context,
     );
-    setState(() => _exportando = false);
+    if (mounted) setState(() => _exportando = false);
   }
 
   void _mostrarOpcionesRegistro(BuildContext context, VitalSign reg) {

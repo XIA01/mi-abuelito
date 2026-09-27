@@ -1,0 +1,55 @@
+rules_version = '2';
+
+// Reglas del proyecto Firebase "mi-abuelito-38d0d", COMPARTIDO por dos apps:
+//   • Mi Abuelito (este repo)        → abuelos/{codigo}/registros/{id}   (sin login)
+//   • Diario Clínico (repo aparte)   → usuarios/{uid}/…, ai_global/…      (login con Google)
+// Este archivo es la única fuente de verdad: al cambiarlo, revisar que las DOS apps sigan andando.
+// Publicar: npx firebase-tools deploy --only firestore:rules --project mi-abuelito-38d0d
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Mi Abuelito ──────────────────────────────────────────────────────────
+    // No hay login: la ficha se abre con su código, que es el ID del documento.
+    // Nunca se puede listar la colección, así que para leer una ficha hay que conocer el código.
+    // Código: 8 caracteres sin símbolos confundibles (32^8 ≈ 1 billón de combinaciones,
+    // ver _generarIdCorto en patient_provider.dart). Los códigos viejos de 4 y 6 no se aceptan.
+    function codigoValido(codigo) {
+      return codigo.matches('[A-HJ-NP-Z2-9]{8}');
+    }
+
+    match /abuelos/{codigo} {
+      allow get, create, update, delete: if codigoValido(codigo);
+      allow list: if false;
+
+      match /registros/{registroId} {
+        allow read, write: if codigoValido(codigo);
+      }
+    }
+
+    // ─── Diario Clínico ───────────────────────────────────────────────────────
+    // Cada persona (login con Google) sólo accede a sus propios datos.
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    match /usuarios/{uid} {
+      match /meta/{docId} {
+        allow read, write: if isOwner(uid);
+      }
+      match /consultas/{consultaId} {
+        allow read, write: if isOwner(uid);
+      }
+      // Cuota diaria de IA: la escribe sólo el servidor (/api/analizar, con firebase-admin).
+      match /ai_usage/{dia} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+    }
+
+    // Cuota global de IA: sólo el servidor.
+    match /ai_global/{dia} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,6 +1,6 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
-import 'package:uuid/uuid.dart';
 import '../models/vital_sign.dart';
 import '../models/patient_profile.dart';
 import '../services/database_service.dart';
@@ -12,7 +12,7 @@ enum FiltroFranja { todas, manana, tarde, noche }
 class PatientProvider extends ChangeNotifier {
   final DatabaseService _db = DatabaseService();
   final NotificationService _notif = NotificationService();
-  final _uuid = const Uuid();
+  final _random = Random.secure();
 
   PatientProfile? _perfil;
   String _familiarNombre = '';
@@ -157,7 +157,8 @@ class PatientProvider extends ChangeNotifier {
       _familiarNombre = familiar['nombre'] ?? '';
       _familiarParentesco = familiar['parentesco'] ?? '';
       if (_perfil != null) {
-        await _cargarRegistros();
+        // Mostrar la caché local al instante; el stream trae los datos de la nube
+        _todosRegistros = await _db.cargarRegistrosLocales(_perfil!.id);
         _iniciarStream();
       }
     } catch (e) {
@@ -193,6 +194,7 @@ class PatientProvider extends ChangeNotifier {
       _registrosSub = _db.streamRegistros(_perfil!.id).listen(
         (nuevos) {
           _todosRegistros = nuevos;
+          _db.guardarCacheLocal(_perfil!.id, nuevos);
           notifyListeners();
         },
         onError: (e) {
@@ -204,12 +206,6 @@ class PatientProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _cargarRegistros() async {
-    if (_perfil == null) return;
-    _todosRegistros = await _db.cargarRegistros(_perfil!.id);
-    notifyListeners();
-  }
-
   // ─── Creación del perfil del abuelo ─────────────────────────────────────
   Future<void> crearPerfil({
     required String nombre,
@@ -217,7 +213,11 @@ class PatientProvider extends ChangeNotifier {
     required String familiarNombre,
     required String familiarParentesco,
   }) async {
-    final id = _generarIdCorto();
+    // Evitar pisar la ficha de otra familia si el código ya existe
+    String id = _generarIdCorto();
+    for (int i = 0; i < 5 && await _db.buscarPerfilEnNube(id) != null; i++) {
+      id = _generarIdCorto();
+    }
     final perfil = PatientProfile(
       id: id,
       nombre: nombre,
@@ -239,19 +239,24 @@ class PatientProvider extends ChangeNotifier {
     required String familiarNombre,
     required String familiarParentesco,
   }) async {
-    final codigoUpper = codigo.trim().toUpperCase();
+    final codigoUpper = normalizarCodigo(codigo);
+    if (!codigoValido(codigoUpper)) {
+      _error = 'El código tiene 8 letras y números (ej: K7QM-4XPA). Revisalo.';
+      notifyListeners();
+      return;
+    }
     _cargando = true;
     notifyListeners();
 
     try {
       // 1. Buscar el abuelo en la nube
-      final perfilNube = await _db.buscarPerfilEnNube(codigoUpper);
-      final perfil = perfilNube ??
-          PatientProfile(
-            id: codigoUpper,
-            nombre: 'Abuelo/a',
-            edad: 0,
-          );
+      final perfil = await _db.buscarPerfilEnNube(codigoUpper);
+      if (perfil == null) {
+        // No crear una ficha vacía por un código mal escrito
+        _error = 'No encontramos ese código. Revisalo y verificá tu conexión.';
+        return;
+      }
+      _error = null;
 
       await _db.guardarPerfil(perfil);
       await _db.guardarFamiliar(familiarNombre, familiarParentesco);
@@ -259,8 +264,8 @@ class PatientProvider extends ChangeNotifier {
       _familiarNombre = familiarNombre;
       _familiarParentesco = familiarParentesco;
 
+      _todosRegistros = await _db.cargarRegistrosLocales(perfil.id);
       _iniciarStream();
-      await _cargarRegistros();
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -275,9 +280,12 @@ class PatientProvider extends ChangeNotifier {
     _cargando = true;
     notifyListeners();
     try {
-      await _db.guardarRegistro(registro);
-      await _notif.notificarNuevoRegistro(registro);
-      await _cargarRegistros();
+      final guardado = await _db.guardarRegistro(registro);
+      await _notif.notificarNuevoRegistro(guardado);
+      _todosRegistros = [
+        guardado,
+        ..._todosRegistros.where((r) => r.id != guardado.id),
+      ]..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -289,7 +297,8 @@ class PatientProvider extends ChangeNotifier {
   Future<void> eliminarRegistro(String registroId) async {
     if (_perfil == null) return;
     await _db.eliminarRegistro(_perfil!.id, registroId);
-    await _cargarRegistros();
+    _todosRegistros = _todosRegistros.where((r) => r.id != registroId).toList();
+    notifyListeners();
   }
 
   // ─── Salir de este dispositivo (mantiene registros para otros) ─────────────
@@ -341,17 +350,26 @@ class PatientProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ─── Helpers ─────────────────────────────────────────────────────────────
-  String _generarIdCorto() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    final random = _uuid.v4().replaceAll('-', '');
-    String id = '';
-    for (int i = 0; i < 4; i++) {
-      final idx = int.parse(random[i * 2], radix: 16) % chars.length;
-      id += chars[idx];
-    }
-    return id;
-  }
+  // ─── Código del abuelo ──────────────────────────────────────────────────
+  // 8 caracteres de un alfabeto sin símbolos que se confunden (sin I, O, 0 ni 1):
+  // 32^8 ≈ 1 billón de combinaciones, inviable de adivinar probando aunque haya miles
+  // de familias. Se guarda sin guion ("K7QM4XPA") y se muestra como "K7QM-4XPA".
+  // Las reglas de Firestore (firestore.rules) sólo aceptan este formato.
+  static const _alfabetoCodigo = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  static final _formatoCodigo = RegExp(r'^[A-HJ-NP-Z2-9]{8}$');
+
+  /// Acepta el código como lo escriba la persona: minúsculas, con guion o espacios.
+  static String normalizarCodigo(String valor) =>
+      valor.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+
+  static bool codigoValido(String codigo) => _formatoCodigo.hasMatch(codigo);
+
+  static String formatearCodigo(String codigo) => codigo.length == 8
+      ? '${codigo.substring(0, 4)}-${codigo.substring(4)}'
+      : codigo;
+
+  String _generarIdCorto() => List.generate(
+      8, (_) => _alfabetoCodigo[_random.nextInt(_alfabetoCodigo.length)]).join();
 
   VitalSign crearRegistroGlucosa({
     required double valor,

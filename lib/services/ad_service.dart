@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:flutter/foundation.dart';
 
@@ -26,6 +27,7 @@ class AdService {
 
   InterstitialAd? _interstitialAd;
   bool _isInterstitialReady = false;
+  int _reintentosCarga = 0;
 
   // ─── Inicialización del SDK ───────────────────────────────────────────────
   Future<void> initialize() async {
@@ -55,30 +57,46 @@ class AdService {
         onAdLoaded: (ad) {
           _interstitialAd = ad;
           _isInterstitialReady = true;
-          ad.fullScreenContentCallback = FullScreenContentCallback(
-            onAdDismissedFullScreenContent: (ad) {
-              ad.dispose();
-              _isInterstitialReady = false;
-              _cargarInterstitial(); // Precargar el siguiente
-            },
-          );
+          _reintentosCarga = 0;
         },
         onAdFailedToLoad: (error) {
           debugPrint('Interstitial falló al cargar: $error');
           _isInterstitialReady = false;
+          // Reintentar con espera creciente (30s, 60s, 120s) en vez de quedarse sin anuncio toda la sesión
+          if (_reintentosCarga < 3) {
+            final espera = Duration(seconds: 30 << _reintentosCarga);
+            _reintentosCarga++;
+            Future.delayed(espera, _cargarInterstitial);
+          }
         },
       ),
     );
   }
 
-  /// Muestra el interstitial si está listo (ej. antes de generar PDF)
+  /// Muestra el interstitial si está listo (ej. antes de generar PDF) y espera a que se cierre.
   /// Retorna true si se mostró, false si no estaba listo.
   Future<bool> mostrarInterstitial() async {
-    if (_isInterstitialReady && _interstitialAd != null) {
-      await _interstitialAd!.show();
-      return true;
-    }
-    return false;
+    final ad = _interstitialAd;
+    if (!_isInterstitialReady || ad == null) return false;
+
+    final cerrado = Completer<bool>();
+    ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+        if (!cerrado.isCompleted) cerrado.complete(true);
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        debugPrint('Interstitial falló al mostrarse: $error');
+        ad.dispose();
+        if (!cerrado.isCompleted) cerrado.complete(false);
+      },
+    );
+    _interstitialAd = null;
+    _isInterstitialReady = false;
+    await ad.show();
+    final mostrado = await cerrado.future;
+    _cargarInterstitial(); // Precargar el siguiente
+    return mostrado;
   }
 
   void dispose() {
